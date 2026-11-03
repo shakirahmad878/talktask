@@ -60,16 +60,18 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (fontError) throw fontError;
+    if (fontError) {
+      console.warn('Font loading error (using fallback):', fontError);
+    }
   }, [fontError]);
 
   useEffect(() => {
-    if (fontsLoaded && dbReady && isLoaded) {
-      SplashScreen.hideAsync();
+    if ((fontsLoaded || fontError) && dbReady && isLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded, dbReady, isLoaded]);
+  }, [fontsLoaded, fontError, dbReady, isLoaded]);
 
-  if (!fontsLoaded || !dbReady || !isLoaded) {
+  if ((!fontsLoaded && !fontError) || !dbReady || !isLoaded) {
     return null;
   }
 

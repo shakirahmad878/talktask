@@ -1,56 +1,94 @@
+import { useEffect, useState } from 'react';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useColorScheme } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
+import { initDatabase } from '../src/services/db/database';
+import { NotificationManager } from '../src/services/notifications/NotificationManager';
+import { useSettingsStore } from '../src/store/useSettingsStore';
+import { useNotesStore } from '../src/store/useNotesStore';
+import { useTasksStore } from '../src/store/useTasksStore';
+import { VoiceRecordingModal } from '../src/components/voice/VoiceRecordingModal';
+import { OnboardingModal } from '../src/components/onboarding/OnboardingModal';
+import { Colors } from '../src/theme';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   anchor: '(tabs)',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+  const [dbReady, setDbReady] = useState(false);
+
+  const { theme, hasCompletedOnboarding, isLoaded, loadSettings, setOnboardingCompleted } =
+    useSettingsStore();
+  const loadNotes = useNotesStore((s) => s.loadNotes);
+  const loadTasks = useTasksStore((s) => s.loadTasks);
+  const loadChecklists = useTasksStore((s) => s.loadChecklists);
+
+  const systemColorScheme = useColorScheme();
+  const isDark =
+    theme === 'dark' || (theme === 'system' && systemColorScheme === 'dark');
+
+  // Initialize DB and Settings
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+    async function setupApp() {
+      try {
+        initDatabase();
+        await loadSettings();
+        loadNotes();
+        loadTasks();
+        loadChecklists();
+        await NotificationManager.resyncUpcomingReminders();
+        setDbReady(true);
+      } catch (err) {
+        console.error('App setup error:', err);
+        setDbReady(true);
+      }
+    }
+    setupApp();
+  }, []);
 
   useEffect(() => {
-    if (loaded) {
+    if (fontError) throw fontError;
+  }, [fontError]);
+
+  useEffect(() => {
+    if (fontsLoaded && dbReady && isLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [fontsLoaded, dbReady, isLoaded]);
 
-  if (!loaded) {
+  if (!fontsLoaded || !dbReady || !isLoaded) {
     return null;
   }
 
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
-    </ThemeProvider>
+
+      {/* Global Voice Modal */}
+      <VoiceRecordingModal isDark={isDark} />
+
+      {/* Onboarding Guide */}
+      <OnboardingModal
+        visible={!hasCompletedOnboarding}
+        onComplete={() => setOnboardingCompleted()}
+        isDark={isDark}
+      />
+    </>
   );
 }

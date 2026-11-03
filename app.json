@@ -54,7 +54,8 @@
           "icon": "./assets/images/icon.png",
           "color": "#4F46E5"
         }
-      ]
+      ],
+      "./plugins/withProguard.js"
     ],
     "experiments": {
       "typedRoutes": true

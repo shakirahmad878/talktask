@@ -3,16 +3,19 @@ import { Platform } from 'react-native';
 import { RemindersRepository } from '../db/RemindersRepository';
 import { Reminder } from '../../types';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    priority: Notifications.AndroidNotificationPriority.HIGH,
-  }),
-});
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch (err) {
+  console.warn('Failed to configure notification handler:', err);
+}
 
 export class NotificationManager {
   static async requestPermissions(): Promise<boolean> {
@@ -64,7 +67,6 @@ export class NotificationManager {
           body: reminder.title,
           data: { reminderId: reminder.id, linkedType: reminder.linked_type, linkedId: reminder.linked_id },
           sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,

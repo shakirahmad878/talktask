@@ -44,19 +44,43 @@ export default function RootLayout() {
   useEffect(() => {
     async function setupApp() {
       try {
-        initDatabase();
-        await loadSettings();
-        loadNotes();
-        loadTasks();
-        loadChecklists();
-        await NotificationManager.resyncUpcomingReminders();
-        setDbReady(true);
+        try {
+          initDatabase();
+        } catch (dbErr) {
+          console.error('Database init error:', dbErr);
+        }
+        try {
+          await loadSettings();
+        } catch (setErr) {
+          console.warn('Settings load error:', setErr);
+        }
+        try {
+          loadNotes();
+          loadTasks();
+          loadChecklists();
+        } catch (storeErr) {
+          console.warn('Store load error:', storeErr);
+        }
+        try {
+          await NotificationManager.resyncUpcomingReminders();
+        } catch (notifErr) {
+          console.warn('Reminders resync error:', notifErr);
+        }
       } catch (err) {
         console.error('App setup error:', err);
+      } finally {
         setDbReady(true);
       }
     }
     setupApp();
+
+    // Safety timeout: ensure app unblocks even under extreme slow-boot or storage delay
+    const fallbackTimer = setTimeout(() => {
+      setDbReady(true);
+      SplashScreen.hideAsync().catch(() => {});
+    }, 4000);
+
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
   useEffect(() => {

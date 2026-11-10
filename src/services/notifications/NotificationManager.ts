@@ -18,16 +18,8 @@ try {
 }
 
 export class NotificationManager {
-  static async requestPermissions(): Promise<boolean> {
+  static async initChannel(): Promise<void> {
     try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('talktask_reminders', {
           name: 'TalkTask Reminders',
@@ -36,6 +28,21 @@ export class NotificationManager {
           lightColor: '#4F46E5',
           sound: 'default',
         });
+      }
+    } catch (e) {
+      console.warn('Failed to initialize notification channel:', e);
+    }
+  }
+
+  static async requestPermissions(): Promise<boolean> {
+    try {
+      await this.initChannel();
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
       }
 
       return finalStatus === 'granted';
@@ -46,21 +53,23 @@ export class NotificationManager {
   }
 
   static async scheduleReminderNotification(reminder: Reminder): Promise<string | null> {
-    const hasPerm = await this.requestPermissions();
-    if (!hasPerm) {
-      console.warn('Notification permissions not granted');
-      return null;
-    }
-
-    const scheduledDate = new Date(reminder.scheduled_at);
-    const now = new Date();
-
-    if (scheduledDate.getTime() <= now.getTime()) {
-      console.warn('Cannot schedule reminder in the past');
-      return null;
-    }
-
     try {
+      const hasPerm = await this.requestPermissions();
+      if (!hasPerm) {
+        console.warn('Notification permissions not granted; skipping system alarm');
+        return null;
+      }
+
+      const scheduledDate = new Date(reminder.scheduled_at);
+      const now = new Date();
+
+      if (scheduledDate.getTime() <= now.getTime()) {
+        console.warn('Cannot schedule reminder in the past');
+        return null;
+      }
+
+      await this.initChannel();
+
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
           title: 'TalkTask Reminder',
@@ -79,7 +88,7 @@ export class NotificationManager {
       RemindersRepository.updateNotificationId(reminder.id, notificationId);
       return notificationId;
     } catch (err) {
-      console.error('Failed to schedule local notification:', err);
+      console.warn('Failed to schedule local notification safely:', err);
       return null;
     }
   }
@@ -95,26 +104,34 @@ export class NotificationManager {
 
   /**
    * Re-syncs upcoming reminders with Android notification system upon app boot.
+   * Performs non-interactive permission check so startup is never blocked by permission modals.
    */
   static async resyncUpcomingReminders(): Promise<void> {
     try {
+      await this.initChannel();
+
+      // Silent permission check: do not prompt on launch
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('[NotificationManager] Notifications not granted yet; skipping startup alarm resync');
+        return;
+      }
+
       const upcoming = RemindersRepository.getUpcoming(25);
       const now = new Date();
 
       for (const rem of upcoming) {
         const schedTime = new Date(rem.scheduled_at).getTime();
         if (schedTime > now.getTime()) {
-          // If no notification ID or needing refresh, re-schedule
           if (!rem.notification_id) {
             await this.scheduleReminderNotification(rem);
           }
         } else {
-          // Mark as fired
           RemindersRepository.setStatus(rem.id, 'fired');
         }
       }
     } catch (e) {
-      console.warn('Error resyncing reminders:', e);
+      console.warn('Error resyncing reminders safely:', e);
     }
   }
 }

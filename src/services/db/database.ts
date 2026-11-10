@@ -8,7 +8,12 @@ let dbInstance: SQLite.SQLiteDatabase | null = null;
 export function getDatabase(): SQLite.SQLiteDatabase {
   if (!dbInstance) {
     dbInstance = SQLite.openDatabaseSync(DATABASE_NAME);
-    dbInstance.execSync('PRAGMA foreign_keys = ON;');
+    try {
+      dbInstance.execSync('PRAGMA journal_mode = WAL;');
+      dbInstance.execSync('PRAGMA foreign_keys = ON;');
+    } catch (e) {
+      console.warn('SQLite PRAGMA setup warning:', e);
+    }
   }
   return dbInstance;
 }
@@ -19,23 +24,27 @@ export function setDatabaseInstance(db: any) {
 }
 
 export function initDatabase(): void {
-  const db = getDatabase();
+  try {
+    const db = getDatabase();
 
-  // Create migrations tracker
-  db.execSync(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      version INTEGER PRIMARY KEY,
-      applied_at TEXT NOT NULL
+    // Create migrations tracker
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      );
+    `);
+
+    const currentVersionRow = db.getFirstSync<{ version: number }>(
+      'SELECT MAX(version) as version FROM schema_migrations'
     );
-  `);
+    const currentVersion = currentVersionRow?.version || 0;
 
-  const currentVersionRow = db.getFirstSync<{ version: number }>(
-    'SELECT MAX(version) as version FROM schema_migrations'
-  );
-  const currentVersion = currentVersionRow?.version || 0;
-
-  if (currentVersion < 1) {
-    runMigrationV1(db);
+    if (currentVersion < 1) {
+      runMigrationV1(db);
+    }
+  } catch (err) {
+    console.error('Failed to initialize database schema safely:', err);
   }
 }
 

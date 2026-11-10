@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import { Checklist, ChecklistItem } from '../../types';
+import { ChecklistValidationSchema } from '../validation/schemas';
 
 export class ChecklistsRepository {
   static getAll(): Checklist[] {
@@ -43,6 +44,7 @@ export class ChecklistsRepository {
   }
 
   static create(title: string, itemTexts: string[] = []): Checklist {
+    const validated = ChecklistValidationSchema.parse({ title, items: itemTexts });
     const db = getDatabase();
     const id = `chk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
@@ -50,10 +52,10 @@ export class ChecklistsRepository {
     db.withTransactionSync(() => {
       db.runSync(
         'INSERT INTO checklists (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)',
-        [id, title.trim(), now, now]
+        [id, validated.title.trim(), now, now]
       );
 
-      itemTexts.forEach((text, index) => {
+      validated.items.forEach((text, index) => {
         if (!text.trim()) return;
         const itemId = `chki_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 6)}`;
         db.runSync(

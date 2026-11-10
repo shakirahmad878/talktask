@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import { Reminder, ReminderLinkedType, ReminderStatus } from '../../types';
+import { ReminderValidationSchema } from '../validation/schemas';
 
 export class RemindersRepository {
   static getAll(): Reminder[] {
@@ -35,8 +36,9 @@ export class RemindersRepository {
     notification_id?: string | null;
     status?: ReminderStatus;
   }): Reminder {
+    const validated = ReminderValidationSchema.parse(data);
     const db = getDatabase();
-    const id = data.id || `rem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = validated.id || `rem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
     db.runSync(
@@ -45,24 +47,24 @@ export class RemindersRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
-        data.linked_type || 'standalone',
-        data.linked_id || null,
-        data.title.trim(),
-        data.scheduled_at,
-        data.notification_id || null,
-        data.status || 'scheduled',
+        validated.linked_type,
+        validated.linked_id || null,
+        validated.title.trim(),
+        validated.scheduled_at,
+        validated.notification_id || null,
+        validated.status,
         now,
       ]
     );
 
     return {
       id,
-      linked_type: data.linked_type || 'standalone',
-      linked_id: data.linked_id || null,
-      title: data.title.trim(),
-      scheduled_at: data.scheduled_at,
-      notification_id: data.notification_id || null,
-      status: data.status || 'scheduled',
+      linked_type: validated.linked_type,
+      linked_id: validated.linked_id || null,
+      title: validated.title.trim(),
+      scheduled_at: validated.scheduled_at,
+      notification_id: validated.notification_id || null,
+      status: validated.status,
       created_at: now,
     };
   }

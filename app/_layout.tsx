@@ -13,6 +13,7 @@ import { useNotesStore } from '../src/store/useNotesStore';
 import { useTasksStore } from '../src/store/useTasksStore';
 import { VoiceRecordingModal } from '../src/components/voice/VoiceRecordingModal';
 import { OnboardingModal } from '../src/components/onboarding/OnboardingModal';
+import { GlobalErrorBoundary } from '../src/components/common/GlobalErrorBoundary';
 import { Colors } from '../src/theme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -21,7 +22,7 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -100,7 +101,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <GlobalErrorBoundary>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -115,6 +116,6 @@ export default function RootLayout() {
         onComplete={() => setOnboardingCompleted()}
         isDark={isDark}
       />
-    </>
+    </GlobalErrorBoundary>
   );
 }

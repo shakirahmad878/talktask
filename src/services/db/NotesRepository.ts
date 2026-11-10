@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import { Note, NoteCategory, LanguageCode } from '../../types';
+import { NoteValidationSchema } from '../validation/schemas';
 
 export class NotesRepository {
   static getAll(options?: {
@@ -52,8 +53,9 @@ export class NotesRepository {
     is_pinned?: boolean;
     is_favourite?: boolean;
   }): Note {
+    const validated = NoteValidationSchema.parse(data);
     const db = getDatabase();
-    const id = data.id || `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = validated.id || `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
     db.runSync(
@@ -62,13 +64,13 @@ export class NotesRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
-        data.title.trim(),
-        data.content.trim(),
-        data.source_type || 'voice',
-        data.language || 'en',
-        data.category || 'general',
-        data.is_pinned ? 1 : 0,
-        data.is_favourite ? 1 : 0,
+        validated.title.trim(),
+        validated.content.trim(),
+        validated.source_type,
+        validated.language,
+        validated.category,
+        validated.is_pinned ? 1 : 0,
+        validated.is_favourite ? 1 : 0,
         now,
         now,
       ]

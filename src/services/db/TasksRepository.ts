@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import { Task, TaskPriority, TaskStatus } from '../../types';
+import { TaskValidationSchema } from '../validation/schemas';
 
 export class TasksRepository {
   static getAll(options?: {
@@ -60,8 +61,9 @@ export class TasksRepository {
     priority?: TaskPriority;
     due_at?: string | null;
   }): Task {
+    const validated = TaskValidationSchema.parse(data);
     const db = getDatabase();
-    const id = data.id || `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = validated.id || `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
 
     db.runSync(
@@ -70,11 +72,11 @@ export class TasksRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
-        data.title.trim(),
-        data.description ? data.description.trim() : null,
-        data.status || 'pending',
-        data.priority || 'medium',
-        data.due_at || null,
+        validated.title.trim(),
+        validated.description ? validated.description.trim() : null,
+        validated.status,
+        validated.priority,
+        validated.due_at || null,
         now,
         now,
       ]

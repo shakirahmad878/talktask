@@ -55,7 +55,9 @@
           "color": "#4F46E5"
         }
       ],
-      "./plugins/withProguard.js"
+      "./plugins/withProguard.js",
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
